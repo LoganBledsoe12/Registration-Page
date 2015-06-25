@@ -3433,6 +3433,7 @@ Backbone.$ = $;
 var _ = require('backbone/node_modules/underscore');
 
 var parseClassNameProperty = 'parseClassName';
+var sessionToken = window.localStorage.getItem('sessionToken');
 
 // Update collection parse
 var original_parse = Backbone.Collection.prototype.parse; 
@@ -3468,9 +3469,87 @@ var ajaxSync = Backbone.sync;
 module.exports = function(parseSettings) {
 	parseSettings.apiVersion = parseSettings.apiVersion || 1;
 
+	function getHeaders() {
+		var headers = {
+			"X-Parse-Application-Id": parseSettings.appId,
+			"X-Parse-REST-API-Key": parseSettings.apiKey
+		};
+		if(sessionToken) {
+			headers['X-Parse-Session-Token'] = sessionToken;
+		}
+
+		console.log('getHeaders', headers);
+
+		return headers;
+	}
+
 	// Update model parse
 	var ParseModel = {
+		me: function(options) {
+			var self = this;
+			options = options || {};
+			Backbone.$.ajax({
+				//data
+				contentType: "application/json",
+				processData: false,
+				dataType: 'json',
+				data: '',
+
+				//action
+				url: 'https://api.parse.com/' + parseSettings.apiVersion + '/users/me',
+				type: 'GET',
+
+				//authentication
+				headers: getHeaders()
+			})
+			.success(function(data) {
+				self.set(data);
+				if(options.success) {
+					options.success(self);
+				}
+			})
+			.error(function(response) {
+				if(options.error) {
+					options.error(self, response);
+				}
+			});
+		},
+		logout: function(options) {
+			var self = this;
+			sessionToken = null;
+			this.clear();
+			window.localStorage.removeItem('sessionToken');
+			options = options || {};
+			Backbone.$.ajax({
+				//data
+				contentType: "application/json",
+				processData: false,
+				dataType: 'json',
+				data: '',
+
+				//action
+				url: 'https://api.parse.com/' + parseSettings.apiVersion + '/logout',
+				type: 'POST',
+
+				//authentication
+				headers: getHeaders()
+			})
+			.success(function(data) {
+				self.set(data);
+				if(options.success) {
+					options.success(self);
+				}
+			})
+			.error(function(response) {
+				if(options.error) {
+					options.error(self, response);
+				}
+			});
+		},
 		login : function(credentials, options) {
+			var self = this;
+
+			options = options || {};
 
 			if(!this.__proto__.isUser) {
 				throw 'Cannot call `login` on non-user models. Set the `isUser` property to `true` on this model to make it a user model.';
@@ -3483,8 +3562,7 @@ module.exports = function(parseSettings) {
 			if(!credentials.hasOwnProperty('password')) {
 				throw 'Cannot call `login` without a `password`.';
 			}
-
-			var self = this;
+			
 			Backbone.$.ajax({
 				//data
 				contentType: "application/json",
@@ -3499,12 +3577,11 @@ module.exports = function(parseSettings) {
 				type: 'GET',
 
 				//authentication
-				headers: {
-					"X-Parse-Application-Id": parseSettings.appId,
-					"X-Parse-REST-API-Key": parseSettings.apiKey
-				}
+				headers: getHeaders()
 			})
 			.success(function(data) {
+				sessionToken = data.sessionToken;
+				window.localStorage.setItem('sessionToken', sessionToken);
 				self.set(data);
 				if(options.success) {
 					options.success(self);
@@ -3555,10 +3632,7 @@ module.exports = function(parseSettings) {
 			type: type,
 
 			//authentication
-			headers: {
-				"X-Parse-Application-Id": parseSettings.appId,
-				"X-Parse-REST-API-Key": parseSettings.apiKey
-			}
+			headers: getHeaders()
 		};
 
 		return $.ajax(_.extend(options, request));
@@ -33414,6 +33488,178 @@ module.exports = React.createClass({
 		};
 		return React.createElement(
 			'form',
+			{ onSubmit: this.LogInSubmitted },
+			React.createElement('input', { className: 'emailtext', ref: 'emailText', type: 'text', placeholder: 'Email' }),
+			React.createElement('input', { className: 'passwordtext', ref: 'passwordText', type: 'password', placeholder: 'Password' }),
+			React.createElement(
+				'button',
+				{ className: 'btnsubmit', ref: 'btnsubmit', type: 'submit' },
+				'Submit'
+			),
+			React.createElement(
+				'button',
+				{ onClick: this.GoToSignUp, className: 'signup', ref: 'signup', type: 'button' },
+				'Sign Up'
+			),
+			React.createElement(
+				'div',
+				{ style: divStyle, ref: 'error' },
+				this.state.message
+			)
+		);
+	},
+
+	GoToSignUp: function GoToSignUp() {
+		myRouter.navigate('/signup', { trigger: true });
+	},
+
+	LogInSubmitted: function LogInSubmitted(e) {
+		e.preventDefault();
+		var errormessage = '';
+		var emailText = this.refs.emailText.getDOMNode().value;
+		var passwordText = this.refs.passwordText.getDOMNode().value;
+
+		if (emailText.length == 0) {
+			errormessage = 'Please enter an email address';
+		}
+		if (passwordText.length == 0) {
+			errormessage = 'Please enter a password';
+		}
+		if (!validator.isEmail(emailText)) {
+			errormessage = 'email looks wrong';
+		}
+
+		Parse.initialize('UVbkySszM5xnKSjg3OuH0IVP5QB3FtkXoJTe51W8', '5H641ynBXCG5VkMQ8Y6rTzIuyTkjtTTtVGDmXWtp');
+
+		this.setState({ message: errormessage });
+		var user = new UserModel();
+		var self = this;
+		user.login({
+			username: emailText,
+			password: passwordText
+		}, {
+			success: function success(userModel) {
+				console.log('user was logged in');
+				myRouter.navigate('/profile', { trigger: true });
+			},
+			error: function error(userModel, response) {
+				console.log('user was not logged in', response.responseJSON);
+				self.setState({ message: response.message });
+			}
+		});
+	}
+});
+
+},{"../models/UserModel":166,"react":160,"validator":161}],163:[function(require,module,exports){
+'use strict';
+
+var React = require('react');
+var validator = require('validator');
+var UserModel = require('../models/UserModel');
+var Backbone = require('backparse')({
+	appId: 'UVbkySszM5xnKSjg3OuH0IVP5QB3FtkXoJTe51W8',
+	apiKey: 'UTUazmWvDNPWuWNTnsAcPUVapwLYBVZIEn8kUCYm',
+	apiVersion: 1
+});
+var BlogPostModel = Backbone.Model.extend({
+	defaults: {
+		title: '',
+		body: ''
+	},
+	parseClassName: 'blogpost',
+	idAttribute: 'objectId'
+});
+
+module.exports = React.createClass({
+	displayName: 'exports',
+
+	getInitialState: function getInitialState() {
+		return { blogpost: [] };
+	},
+	componentDidMount: function componentDidMount() {
+		this.LoadBlogPost();
+	},
+	render: function render() {
+		var divStyle = {
+			color: 'red'
+		};
+		return React.createElement(
+			'form',
+			{ onSubmit: this.LogInSubmitted },
+			React.createElement('input', { className: 'title', ref: 'title', type: 'text', placeholder: 'Post Title' }),
+			React.createElement('input', { className: 'body', ref: 'body', type: 'text' }),
+			React.createElement(
+				'button',
+				{ className: 'btnsubmit', ref: 'btnsubmit', type: 'submit' },
+				'Submit'
+			),
+			this.state.blogpost.map(function (m, index) {
+				return React.createElement(
+					'div',
+					null,
+					React.createElement(
+						'div',
+						null,
+						'Title:',
+						m.title
+					),
+					React.createElement(
+						'div',
+						null,
+						'Body:',
+						m.body
+					)
+				);
+			})
+		);
+	},
+	LogInSubmitted: function LogInSubmitted(e) {
+		e.preventDefault();
+		var errormessage = '';
+		var T = this.refs.title.getDOMNode().value;
+		var B = this.refs.body.getDOMNode().value;
+		var BP = new BlogPostModel();
+		BP.set('title', T);
+		BP.set('body', B);
+		var self = this;
+		BP.save().then(function () {
+			self.LoadBlogPost();
+		});
+	},
+	LoadBlogPost: function LoadBlogPost() {
+		var BlogPostCollection = Backbone.Collection.extend({
+			model: BlogPostModel,
+			parseClassName: 'blogpost'
+		});
+		var BPC = new BlogPostCollection();
+		var self = this;
+		BPC.fetch().then(function (e) {
+			self.setState({ blogpost: e.results });
+		});
+	}
+});
+
+},{"../models/UserModel":166,"backparse":3,"react":160,"validator":161}],164:[function(require,module,exports){
+//SignUpComponent
+
+'use strict';
+
+var React = require('react');
+var validator = require('validator');
+var UserModel = require('../models/UserModel');
+
+module.exports = React.createClass({
+	displayName: 'exports',
+
+	getInitialState: function getInitialState() {
+		return { message: '' };
+	},
+	render: function render() {
+		var divStyle = {
+			color: 'red'
+		};
+		return React.createElement(
+			'form',
 			{ onSubmit: this.userSubmitted },
 			React.createElement('input', { className: 'emailtext', ref: 'emailText', type: 'text', placeholder: 'Email' }),
 			React.createElement('input', { className: 'passwordtext', ref: 'passwordText', type: 'password', placeholder: 'Password' }),
@@ -33473,11 +33719,13 @@ module.exports = React.createClass({
 	}
 });
 
-},{"../models/UserModel":164,"react":160,"validator":161}],163:[function(require,module,exports){
+},{"../models/UserModel":166,"react":160,"validator":161}],165:[function(require,module,exports){
 'use strict';
 
 var React = require('react');
-var LogInForm = require('./components/userComponent.js');
+var UserForm = require('./components/userComponent.js');
+var LogIn = require('./components/LogInComponent.js');
+var UserProfile = require('./components/UserProfileComponent.js');
 var Backbone = require('backparse')({
     appId: 'UVbkySszM5xnKSjg3OuH0IVP5QB3FtkXoJTe51W8',
     apiKey: 'UTUazmWvDNPWuWNTnsAcPUVapwLYBVZIEn8kUCYm',
@@ -33490,19 +33738,24 @@ var App = Backbone.Router.extend({
     routes: {
         '': 'login',
         'signup': 'signup',
-        'register': 'register'
+        'profile': 'profile'
 
     },
     login: function login() {
-        React.render(React.createElement(LogInForm, null), document.getElementById('container'));
+        React.render(React.createElement(LogIn, null), document.getElementById('container'));
     },
-    signup: function signup() {},
-    register: function register() {}
+    signup: function signup() {
+        React.render(React.createElement(UserForm, null), document.getElementById('container'));
+    },
+    profile: function profile() {
+        React.render(React.createElement(UserProfile, null), document.getElementById('container'));
+    }
 });
 var myRouter = new App();
 Backbone.history.start();
+window.myRouter = myRouter;
 
-},{"./components/userComponent.js":162,"backparse":3,"react":160}],164:[function(require,module,exports){
+},{"./components/LogInComponent.js":162,"./components/UserProfileComponent.js":163,"./components/userComponent.js":164,"backparse":3,"react":160}],166:[function(require,module,exports){
 'use strict';
 
 var Backbone = require('backparse')({
@@ -33522,7 +33775,7 @@ module.exports = Backbone.Model.extend({
 	isUser: true
 });
 
-},{"backparse":3}]},{},[163])
+},{"backparse":3}]},{},[165])
 
 
 //# sourceMappingURL=all.js.map

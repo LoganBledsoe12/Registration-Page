@@ -1,5 +1,7 @@
 var React = require('react');
-var LogInForm = require ('./components/userComponent.js')
+var UserForm = require ('./components/userComponent.js')
+var LogIn = require ('./components/LogInComponent.js')
+var UserProfile = require ('./components/UserProfileComponent.js')
 var Backbone = require('backparse')({
     appId: 'UVbkySszM5xnKSjg3OuH0IVP5QB3FtkXoJTe51W8',
     apiKey: 'UTUazmWvDNPWuWNTnsAcPUVapwLYBVZIEn8kUCYm',
@@ -12,25 +14,31 @@ var App = Backbone.Router.extend({
     routes: {
         '': 'login',
         'signup': 'signup',
-        'register': 'register'
+        'profile': 'profile'
        
     },
     login: function() {
     	React.render(
-	<LogInForm />,
+	<LogIn />,
 	document.getElementById('container')
 
 );
       
     },
     signup: function(){
-
+    	React.render(
+	<UserForm />,
+	document.getElementById('container'))
     },
-    register: function(){
+    profile: function(){
+    	React.render(
+	<UserProfile />,
+	document.getElementById('container'))
 
     }
 });
 var myRouter = new App();
 Backbone.history.start();
+window.myRouter = myRouter
 
 
