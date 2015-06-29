@@ -30,21 +30,20 @@ module.exports = React.createClass({
 	} 
 		return (
     <form onSubmit={this.LogInSubmitted}>
-		<input className="title" ref="title" type="text" placeholder="Post Title" />
-		<input className="body" ref="body" type="text"/>
+		<input className="title" ref="title" type="text" placeholder="Search" />
 		<select className="category" ref="category">
 			<option value="Baseball">Baseball</option>
 			<option value="Football">Football</option>
 			<option value="Food">Food</option>
 			<option value="Fitness">Fitness</option>
 		</select>
-		<button className="btnsubmit" ref="btnsubmit" type="submit">Submit</button>
+		<button className="btnsubmit" ref="btnsubmit" type="submit">Search</button>
 		{this.state.blogpost.map(function(m, index){
 		return(
 		<div>
-		<div>category-{m.category}</div>
-		<div>Title-{m.title}</div>
-		<div>Body-{m.body}</div>
+		<div>category-{m.get('category')}</div>
+		<div>Title-{m.get('title')}</div>
+		<div>Body-{m.get('body')}</div>
 		</div>)
 	})}
 	</form>
@@ -53,20 +52,13 @@ module.exports = React.createClass({
 		e.preventDefault();
 		var errormessage = ''
 		var T= this.refs.title.getDOMNode().value
-		var B= this.refs.body.getDOMNode().value
 		var C= this.refs.category.getDOMNode().value
-		var BP = new BlogPostModel();
-		BP.set('title',T);
-		BP.set('body', B);
-		BP.set('category',C);
-		var self = this;
-		BP.save().then(function(){
-			self.LoadBlogPost();
+		this.LoadBlogPost(C,T);
 
-		});
+
 
 	},
-	LoadBlogPost: function(){
+	LoadBlogPost: function(category, title){
 		var BlogPostCollection = Backbone.Collection.extend({
     	model: BlogPostModel,
     	parseClassName: 'blogpost',
@@ -74,9 +66,8 @@ module.exports = React.createClass({
 		var BPC = new BlogPostCollection;
 		var self = this;
 		BPC.fetch().then (function(e){
-			self.setState({blogpost:e.results})
+			var collection = new Backbone.Collection(e.results)
+			self.setState({blogpost:collection.where({category:category, title:title})})
 		});
 	}	
 });  
-
-

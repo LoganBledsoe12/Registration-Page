@@ -1,6 +1,7 @@
 var React = require('react');
 var UserForm = require ('./components/userComponent.js')
 var LogIn = require ('./components/LogInComponent.js')
+var BlogPost = require ('./components/BlogPostListComponent.js')
 var UserProfile = require ('./components/UserProfileComponent.js')
 var Backbone = require('backparse')({
     appId: 'UVbkySszM5xnKSjg3OuH0IVP5QB3FtkXoJTe51W8',
@@ -14,7 +15,8 @@ var App = Backbone.Router.extend({
     routes: {
         '': 'login',
         'signup': 'signup',
-        'profile': 'profile'
+        'profile': 'profile',
+        'search': 'search'
        
     },
     login: function() {
@@ -35,6 +37,11 @@ var App = Backbone.Router.extend({
 	<UserProfile />,
 	document.getElementById('container'))
 
+    },
+    search: function(){
+    	React.render(
+    		<BlogPost/>,
+    		document.getElementById('container'))
     }
 });
 var myRouter = new App();
